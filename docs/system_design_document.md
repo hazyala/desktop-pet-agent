@@ -45,6 +45,24 @@ Desktop Pet Agent는 사용자의 데스크톱 환경에 투명한 캐릭터 형
 
 ---
 
+### 1-3. VLA-M 표준 디자인 패턴 매핑
+
+본 프로젝트는 최신 VLA-M(Vision-Language-Action Model) 에이전트의 표준 규격과 설계 패턴을 완벽히 준수하도록 아키텍처가 구성되었습니다. 5개 핵심 도메인별로 적용된 주요 디자인 패턴과 해당 패턴이 구현된 파일은 다음과 같습니다.
+
+| 도메인 | 적용된 패턴 (Design Pattern) | 목적 및 설계 의도 | 적용된 코드(파일) |
+|--------|--------------------------|------------------|----------------|
+| **1. 인식<br/>(Perception)** | **Adapter / Facade Pattern** | `mss`, `EasyOCR`, `pywin32` 등 복잡하고 다양한 외부 시각/운영체제 인식 엔진의 구현 디테일을 은닉하고 공통된 인터페이스(`OCRResult`, `ActiveWindowInfo`)로 변환하여 시스템에 제공합니다. | `sensor/ocr_engine.py`<br/>`sensor/os_monitor.py` |
+| **2. 사고<br/>(Reasoning)** | **State Machine Pattern** | LangGraph를 통해 과거의 기억(Messages)과 현재의 상태(ScreenState)를 전이시키며 '인지-추론-실행-검증' 루프를 순환하는 유한 상태 기계를 구현합니다. | `brain/graph_builder.py`<br/>`brain/graph_state.py` |
+| **2. 사고<br/>(Reasoning)** | **Strategy Pattern** | 향후 작업 복잡도나 요청 유형에 따라 다른 성격의 시스템 프롬프트나 LLM 모델(`qwen3-vl:8b` 등)을 동적으로 교체·선택할 수 있도록 컨텍스트 주입 계층을 분리했습니다. | `brain/nodes/reasoning_node.py` |
+| **3. 행동<br/>(Action)** | **Factory / Registry Pattern** | 도구의 종류(Local, MCP)나 런타임 환경에 구애받지 않고 조건에 맞는 도구 객체(`BaseTool`)를 동적으로 생성, 등록, 필터링하여 제공합니다. | `strategy/tool_registry.py`<br/>`strategy/mcp_client.py` |
+| **3. 행동<br/>(Action)** | **Command Pattern** | 각 도구(명령)의 실행 로직을 내부로 완전히 캡슐화(`@tool` 데코레이터)하여, 호출자(Brain)가 구체적인 실행 방법(Windows, Python 등)을 몰라도 `invoke()` 만으로 Action을 수행할 수 있게 합니다. | `strategy/local_tools.py`<br/>`brain/nodes/tool_node.py` |
+| **4. 기억<br/>(Memory)** | **Repository Pattern** | SQLite DB 등 물리적인 장기 기억 저장 기술의 상세 구현을 숨기고, 비즈니스 로직(Graph)에서 데이터 저장/조회를 간단한 함수로 호출하도록 분리합니다. | `state/memory_db.py` |
+| **4. 기억<br/>(Memory)** | **Blackboard Pattern** | 여러 센서가 각기 수집한 단편적인 최신 정보들을 하나의 단기 공유 메모리판(게시판)에 취합하여 모든 에이전트 노드가 동일한 컨텍스트를 참조할 수 있게 합니다. | `state/blackboard.py` |
+| **5. 기반<br/>(Foundation)**| **Singleton Pattern** | 애플리케이션 전역에서 단 1번만 로드되어야 하는 시스템 환경변수 인스턴스와 공용 로깅 시스템의 무결성을 보장하고 중복 로드를 방지합니다. | `config/settings.py` (`@lru_cache`)<br/>`utils/logger.py` |
+| **5. 기반<br/>(Foundation)**| **DTO (Data Transfer Object)** | 모듈 및 계층 간 데이터를 교환할 때 파이썬 내장 `dict` 단점을 보완하기 위해 Pydantic V2 클래스 규격을 강제하여 타입 안전성과 데이터 무결성을 보장합니다. | `config/types_dto.py` |
+
+---
+
 ## 2. 고수준 아키텍처
 
 ```mermaid
@@ -345,8 +363,9 @@ class AppSettings(BaseSettings):
     ocr_confidence_threshold: float = 0.3
 
     # ── 안전 ──
-    kill_switch_click_count: int = 6
-    kill_switch_time_window: float = 1.0
+    kill_switch_click_count: int = 10
+    kill_switch_time_window: float = 1.5
+    kill_switch_button: str = "right"
     allowed_apps: list[str] = []          # 비어있으면 제한 없음
     allowed_directories: list[str] = []
     dangerous_tools_enabled: bool = False  # move_file, delete_file 등
@@ -359,17 +378,22 @@ class AppSettings(BaseSettings):
     screenshots_dir: str = "data/screenshots"
     logs_dir: str = "data/logs"
     db_path: str = "data/desktop_pet.db"
+    results_dir: str = "data/results"
 
-    class Config:
-        env_file = ".env"
-        env_prefix = "DPET_"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="DPET_",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 ```
 
 ---
 
 ## 4. 모듈별 상세 설계
 
-### 4-1. config/ — 전역 설정 & 타입 정의
+### 4-1. config/ — [기반 - Foundation] 전역 설정 & 타입 정의
 
 | 파일 | 역할 | 핵심 내용 |
 |------|------|----------|
@@ -377,7 +401,7 @@ class AppSettings(BaseSettings):
 | `types_dto.py` | 데이터 전송 객체 | 위 Section 3의 모든 Pydantic 모델 정의 |
 | `constants.py` | 열거형 상수 | `AgentStatus`, `ToolCategory`, `ToolRiskLevel`, `ErrorCode` |
 
-### 4-2. utils/ — 공통 유틸리티
+### 4-2. utils/ — [기반 - Foundation] 공통 유틸리티
 
 | 파일 | 역할 | 핵심 내용 |
 |------|------|----------|
@@ -395,7 +419,7 @@ def setup_logger(log_dir: str = "data/logs"):
     return logger
 ```
 
-### 4-3. sensor/ — 감지부
+### 4-3. sensor/ — [인식 - Perception] 시각 및 상황 감지부
 
 #### screen_grabber.py
 ```
@@ -433,7 +457,7 @@ def setup_logger(log_dir: str = "data/logs"):
   4. win32api.GetCursorPos() → 마우스 좌표
 ```
 
-### 4-4. brain/ — LangGraph 에이전트 엔진
+### 4-4. brain/ — [사고 - Reasoning] LangGraph 에이전트 엔진
 
 #### graph_state.py
 ```
@@ -514,7 +538,7 @@ stateDiagram-v2
   5. action_history에 ActionResult 추가
 ```
 
-### 4-5. strategy/ — 도구 & MCP 클라이언트
+### 4-5. strategy/ — [행동 - Action] 도구 판단 및 MCP 클라이언트
 
 #### mcp_client.py
 ```
@@ -590,7 +614,7 @@ MVP 도구 목록:
 | 20 | `read_word_doc` | Word 문서 내용 읽기 | OFFICE | SAFE | office_toolkit |
 | 21 | `wait_seconds` | 지정 시간 대기 | UTIL | SAFE | — |
 
-### 4-6. embodiment/ — 실행부
+### 4-6. embodiment/ — [행동 - Action] 물리/OS 실행부
 
 #### hid_controller.py
 ```
@@ -659,8 +683,8 @@ MVP 도구 목록:
 ```
 역할: 비상 정지 시스템 (독립 스레드, 항상 동작)
 메커니즘:
-  1. Hard Kill — 좌클릭 6연타 (1초 이내) 또는 Ctrl+Shift+Esc
-     → threading.Event.set() → 모든 Agent Loop 즉시 중단
+  1. Hard Kill — 우클릭 10연타 (1.5초 이내)
+     → threading.Event.set() → 모든 Agent Loop 즉시 중단 → os._exit(1)
      → HID 비활성화, tool queue 플러시
   2. Soft Pause — 설정 가능한 단축키
      → pause_flag = True → Brain이 다음 tool 호출 전 대기
@@ -672,7 +696,7 @@ MVP 도구 목록:
   - threading.Event: pause_event
 ```
 
-### 4-7. state/ — 상태 관리
+### 4-7. state/ — [기억 - Memory] 단기 스냅샷 및 장기 기억
 
 #### blackboard.py
 ```
@@ -713,7 +737,7 @@ CREATE INDEX idx_task_log_status ON task_log(status);
 CREATE INDEX idx_task_log_timestamp ON task_log(timestamp);
 ```
 
-### 4-8. gui/ — PySide6 UI (향후 구현)
+### 4-8. gui/ — [기반 - Foundation] PySide6 UI (향후)
 
 > [!NOTE]
 > Phase 1에서는 스텁 인터페이스만 정의합니다. 실제 구현은 Phase 2에서 수행합니다.
@@ -789,8 +813,8 @@ sequenceDiagram
 
     Note over KS: 항상 실행 중 (pynput Listener)
 
-    User->>KS: 좌클릭 6연타 (1초 이내)
-    KS->>KS: kill_event.set()
+    User->>KS: 우클릭 10연타 (1.5초 이내)
+    KS->>KS: kill_event.set() → os._exit(1)
 
     Brain->>KS: kill_event.is_set()? → True
     Brain->>Brain: Agent Loop 즉시 중단
@@ -839,7 +863,7 @@ sequenceDiagram
 
 | 서비스  | 용도 |
 |--------|----------|
-| Ollama (gemma3:27b) | LLM 추론 |
+| Ollama (qwen3-vl:8b) | VLM 추론 (OCR/시각 인식 + LangGraph 툴콜링 지원) |
 
 ---
 
@@ -859,9 +883,8 @@ sequenceDiagram
 │  - pause_event → 다음 tool 호출 전 대기             │
 ├──────────────────────────────────────────────────┤
 │  Layer 1: Hard Kill (하드웨어 레벨)               │
-│  - 좌클릭 6연타 (1초 이내)                         │
-│  - Ctrl+Shift+Esc 단축키                          │
-│  - kill_event → 즉시 중단, HID 비활성화            │
+│  - 우클릭 10연타 (1.5초 이내)                      │
+│  - kill_event → 즉시 중단 → os._exit(1)           │
 └──────────────────────────────────────────────────┘
 ```
 

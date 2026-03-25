@@ -1,7 +1,7 @@
 # Desktop Pet Agent — Development Plan (개발 계획서)
 
 > **버전**: 1.0  
-> **최종 수정**: 2026-03-23  
+> **최종 수정**: 2026-03-24  
 ---
 
 ## 1. 개발 전략 개요
@@ -9,7 +9,7 @@
 ### 1-1. 단계별 접근 (Phase 분리)
 
 | Phase | 목표 | 핵심 산출물 |
-|-------|------|-----------|
+|-------|------|-----------| 
 | **Phase 1** | 코어 에이전트 파이프라인 | 화면 인식 → LangGraph 추론 → HID/API 실행 |
 | **Phase 2** | UI 및 확장 기능 | PySide6 펫 윈도우, STT/TTS, 외부 DB |
 
@@ -22,172 +22,146 @@
 
 ---
 
-## 2. Phase 1 스프린트 계획
+## 2. Phase 1 — 주별 추천 수행단계
 
-### Sprint 1 — 기반 구축 + 하드코딩 파이프라인
+> Phase 1은 4주차로 구성되며, 각 주차별로 선택 가능한 수행 목록입니다.  
+> 개발 상황에 맞춰 원하는 수행 목록을 선택하여 진행할 수 있습니다.
 
-> **목표**: LLM 없이 하드코딩된 시나리오로 Sensor → Embodiment 경로 검증
+### 1주차 — 에이전트 코어 + Word 자동화 + Kill Switch
 
-| # | 작업 | 구현 파일 | 산출물 / 완료 기준 |
-|---|------|----------|-------------------|
-| 1 | 프로젝트 뼈대 생성 | `environment.yml`, 전체 폴더 구조 | Conda 환경 활성화 + import 에러 없음 |
-| 2 | 전역 설정 모듈 | `config/settings.py`, `config/constants.py` | `.env` 로드 → `AppSettings` 인스턴스 생성 확인 |
-| 3 | DTO 정의 | `config/types_dto.py` | 모든 Pydantic 모델 import + 직렬화/역직렬화 테스트 |
-| 4 | 로깅 시스템 | `utils/logger.py` | 콘솔 + 파일 로그 이중 출력 확인 |
-| 5 | 화면 캡처 | `sensor/screen_grabber.py` | 스크린샷 캡처 → PIL Image 반환 + 파일 저장 |
-| 6 | OCR 엔진 | `sensor/ocr_engine.py` | 스크린샷 → `OCRResult` DTO (한/영 텍스트 + 좌표) |
-| 7 | OS 모니터 | `sensor/os_monitor.py` | `ActiveWindowInfo` + `MouseState` 반환 |
-| 8 | HID 컨트롤러 | `embodiment/hid_controller.py` | 마우스 이동/클릭, 텍스트 입력 (한글 포함) 동작 |
-| 9 | **Kill Switch** | `embodiment/kill_switch.py` | 좌클릭 6연타 → 이벤트 감지, 독립 스레드 동작 |
-| 10 | **하드코딩 E2E** | `tests/test_integration.py` | "메모장 열기 → 텍스트 입력" 시나리오 통과 (LLM 없이) |
+> **목표**: LangGraph + MCP 기반 에이전트 골격 구축, pywin32 COM 기반 Word CRUD, 하드웨어 킬 스위치
 
-#### Sprint 1 검증 방법
+| # | 작업 | 구현 파일 | 산출물 / 완료 기준 | 상태 |
+|---|------|----------|-------------------|------|
+| 1 | 프로젝트 뼈대 생성 | 전체 폴더 구조, `__init__.py` | 폴더/모듈 생성 + import 에러 없음 | 0324구현 완료 |
+| 2 | 패키지 설치 (conda desktoppet) | — | 1주차 필수 라이브러리 설치 완료 | 0324구현 완료 |
+| 3 | 전역 설정 모듈 (PydanticV2) | `config/settings.py` | `.env` 로드 → `AppSettings` 인스턴스 생성 확인 | 0324구현 완료 |
+| 4 | DTO 정의 (PydanticV2) | `config/types_dto.py` | 모든 Pydantic 모델 직렬화/역직렬화 테스트 | 0324구현 완료 |
+| 5 | 열거형 상수 정의 | `config/constants.py` | AgentStatus, ToolCategory, ErrorCode 등 | 0324구현 완료 |
+| 6 | 로깅 시스템 | `utils/logger.py` | 콘솔 + 파일 로그 이중 출력 확인 | 0324구현 완료 |
+| 7 | **Kill Switch (우클릭 10회)** | `embodiment/kill_switch.py` | pynput 마우스 우클릭 10회 연타(1.5초) → 프로세스 종료 | 0324구현 완료 |
+| 8 | **Word 문서 CRUD (COM)** | `embodiment/office_toolkit.py` | pywin32 COM Visible=True, 문서 작성/수정/삭제 | 0324구현 완료 |
+| 9 | **MCP 클라이언트** | `strategy/mcp_client.py` | langchain-mcp-adapters 기반 MCP 서버 연결 | 0324구현 완료 |
+| 10 | **도구 레지스트리** | `strategy/tool_registry.py` | 로컬 도구 + MCP 도구 통합 관리 | 0324구현 완료 |
+| 11 | **로컬 도구 (Word + 유틸)** | `strategy/local_tools.py` | @tool Word CRUD + wait_seconds | 0324구현 완료 |
+| 12 | **LangGraph 상태 정의** | `brain/graph_state.py` | AgentGraphState TypedDict | 0324구현 완료 |
+| 13 | **시스템 프롬프트** | `brain/prompts.py` | LLM 페르소나 + 도구 사용 가이드라인 | 0324구현 완료 |
+| 14 | **Reasoning 노드** | `brain/nodes/reasoning_node.py` | ChatOllama ↔ LLM 호출 + AIMessage 반환 | 0324구현 완료 |
+| 15 | **Tool 노드** | `brain/nodes/tool_node.py` | tool_call 파싱 → 도구 실행 → ToolMessage 반환 | 0324구현 완료 |
+| 16 | **그래프 빌더** | `brain/graph_builder.py` | StateGraph 순환 루프 + compile() | 0324구현 완료 |
+| 17 | **시스템 엔트리포인트** | `main.py` | CLI 명령 → 에이전트 실행 → 결과 출력 | 0324구현 완료 |
+
+#### 1주차 검증 방법
 
 ```bash
-# 1. 환경 설정 확인
-conda activate desktop-pet
-python -c "from config.settings import get_settings; print(get_settings())"
+# 1. 패키지 설치 확인
+conda activate desktoppet
+python -c "import langchain; import langgraph; import pynput; import pydantic; print('패키지 OK')"
 
-# 2. DTO 검증
+# 2. 설정 + DTO 검증
+python -c "from config.settings import get_settings; print(get_settings())"
 python -c "from config.types_dto import ScreenState, TaskRequest; print('DTO OK')"
 
-# 3. 센서 검증 (스크린샷 + OCR)
-python -c "
-from sensor.screen_grabber import ScreenGrabber
-from sensor.ocr_engine import OCREngine
-sg = ScreenGrabber()
-img = sg.capture()
-ocr = OCREngine()
-result = ocr.recognize(img)
-print(f'블록 수: {result.block_count}, 전문: {result.full_text[:100]}')
-"
-
-# 4. HID 검증 (메모장 열기 + 입력)
-python tests/test_integration.py --scenario notepad_typing
-
-# 5. Kill Switch 검증
+# 3. Kill Switch 검증 (마우스 우클릭 10회 연타)
 python -c "
 from embodiment.kill_switch import KillSwitch
 ks = KillSwitch()
 ks.start()
-print('좌클릭 6연타로 종료 테스트...')
-ks.wait_for_kill()
-print('Kill Switch 감지 성공!')
-"
-```
-
----
-
-### Sprint 2 — Brain (LangGraph) 통합 + 도구 레지스트리
-
-> **목표**: LangGraph 기반 순환 루프로 LLM이 도구를 선택하고 실행하는 구조 완성
-
-| # | 작업 | 구현 파일 | 산출물 / 완료 기준 |
-|---|------|----------|-------------------|
-| 1 | LangGraph 상태 정의 | `brain/graph_state.py` | `AgentGraphState` TypedDict 정의 |
-| 2 | 프롬프트 관리 | `brain/prompts.py` | 시스템 프롬프트 + 화면 컨텍스트 템플릿 |
-| 3 | Reasoning 노드 | `brain/nodes/reasoning_node.py` | ChatOllama ↔ LLM 호출 + AIMessage 반환 |
-| 4 | Tool 노드 | `brain/nodes/tool_node.py` | tool_call 파싱 → 도구 실행 → ToolMessage 반환 |
-| 5 | 그래프 빌더 | `brain/graph_builder.py` | StateGraph 구성 + 조건부 엣지 + compile() |
-| 6 | 로컬 도구 정의 | `strategy/local_tools.py` | 21개 MVP 도구 @tool 정의 (Section 4-5 참조) |
-| 7 | 도구 레지스트리 | `strategy/tool_registry.py` | 통합 레지스트리: 등록/검색/활성화 |
-| 8 | Blackboard | `state/blackboard.py` | thread-safe 상태 보관 + 갱신 |
-| 9 | Memory DB | `state/memory_db.py` | SQLite 테이블 생성 + 로그 저장/조회 |
-| 10 | **LLM E2E 테스트** | — | "메모장에 '안녕하세요' 입력해줘" → LLM 주도 실행 성공 |
-
-#### Sprint 2 검증 방법
-
-```bash
-# 1. LangGraph 그래프 구조 확인
-python -c "
-from brain.graph_builder import build_graph
-graph = build_graph()
-print(graph.get_graph().draw_ascii())
+print('마우스 우클릭 10회 연타로 종료 테스트...')
+ks.wait_for_kill(timeout=15)
+ks.stop()
 "
 
-# 2. LLM 연결 확인
-python -c "
-from langchain_ollama import ChatOllama
-llm = ChatOllama(model='gemma3:27b', base_url='http://your-ollama-host:11434')
-resp = llm.invoke('Hello, respond in one word.')
-print(resp.content)
-"
-
-# 3. 도구 레지스트리 확인
-python -c "
-from strategy.tool_registry import ToolRegistry
-reg = ToolRegistry()
-tools = reg.get_all_tools()
-print(f'등록된 도구 수: {len(tools)}')
-for t in tools: print(f'  - {t.name}')
-"
-
-# 4. LLM 주도 E2E (메모장 시나리오)
-python main.py --command "메모장을 열고 '안녕하세요'를 입력해줘"
-```
-
----
-
-### Sprint 3 — OS/Office 도구 + MCP 통합
-
-> **목표**: OS 제어, Office 자동화, MCP 클라이언트까지 포함한 완전한 도구 생태계 구축
-
-| # | 작업 | 구현 파일 | 산출물 / 완료 기준 |
-|---|------|----------|-------------------|
-| 1 | OS 툴킷 | `embodiment/os_toolkit.py` | 앱 실행, 창 전환, 클립보드, 파일 I/O |
-| 2 | Office 툴킷 (COM 우선) | `embodiment/office_toolkit.py` | COM(pywin32) 기반 Excel/Word 실시간 제어 + openpyxl/python-docx 폴백 |
-| 3 | OS 도구 연결 | `strategy/local_tools.py` 추가 | open_app, switch_window, list_directory 등 |
-| 4 | Office 도구 연결 | `strategy/local_tools.py` 추가 | create_excel, read_excel, create_word_doc 등 |
-| 5 | MCP 클라이언트 (langchain-mcp-adapters) | `strategy/mcp_client.py` | MultiServerMCPClient 기반 MCP 서버 연결 + LangChain Tool 자동 변환 |
-| 6 | MCP 레지스트리 통합 | `strategy/tool_registry.py` 수정 | MCP 도구를 통합 레지스트리에 동적 등록 |
-| 7 | Scope 제한 구현 | `embodiment/os_toolkit.py` | 허용 폴더/앱 화이트리스트 적용 |
-| 8 | Soft Pause 구현 | `embodiment/kill_switch.py` 확장 | pause_event + 재개 로직 |
-| 9 | **Office E2E** | — | "실적 데이터를 엑셀로 정리해줘" → Excel 파일 생성 |
-| 10 | **통합 E2E** | — | "카카오톡에서 OO에게 메시지 보내줘" → 전체 파이프라인 |
-
-#### Sprint 3 검증 방법
-
-```bash
-# 1. Office 도구 단위 테스트
+# 4. Word 문서 CRUD 검증 (pywin32 COM, Visible=True)
 python -c "
 from embodiment.office_toolkit import OfficeToolkit
 ot = OfficeToolkit()
-ot.create_workbook('data/test.xlsx', {'Sheet1': [['이름','점수'],['Kim',95],['Lee',88]]})
-data = ot.read_workbook('data/test.xlsx')
-print(data)
+path = ot.create_document('d:/Desktop_Pet/data/test.docx', '테스트', '내용')
+print(f'생성: {path}')
+content = ot.read_document(path)
+print(f'읽기: {content}')
+ot.append_paragraph(path, '추가 문단')
+ot.delete_document(path)
+print('Word CRUD 완료')
 "
 
-# 2. MCP 클라이언트 연결 확인 (MCP 서버 구동 필요)
+# 5. LangGraph 그래프 빌드 확인
 python -c "
-from strategy.mcp_client import MCPClient
-client = MCPClient()
-# 설정된 MCP 서버가 있는 경우에만 동작
-tools = client.get_available_tools()
-print(f'MCP 도구 수: {len(tools)}')
+from brain.graph_builder import build_graph
+graph = build_graph()
+print('그래프 빌드 성공')
+print(graph.get_graph().draw_ascii())
 "
-
-# 3. 통합 E2E
-python main.py --command "D:/Documents 폴더의 파일 목록을 보여줘"
-python main.py --command "새 엑셀 파일을 만들고 1월~3월 매출 데이터를 정리해줘"
 ```
 
 ---
 
-### Sprint 4 — 안정화 + 문서화 + 성능 최적화
+### 2주차 — 센서 + HID 컨트롤러 + 상태 관리 (추천)
+
+> **목표**: 화면 인식(캡처+OCR), HID 물리 제어, 단기/장기 상태 저장
+
+| # | 작업 | 구현 파일 | 산출물 / 완료 기준 | 상태 |
+|---|------|----------|-------------------|------|
+| 1 | 화면 캡처 | `sensor/screen_grabber.py` | mss 기반 스크린샷 → PIL Image + 파일 저장 | |
+| 2 | OCR 엔진 | `sensor/ocr_engine.py` | 스크린샷 → `OCRResult` DTO (한/영 텍스트 + 좌표) | |
+| 3 | OS 모니터 | `sensor/os_monitor.py` | `ActiveWindowInfo` + `MouseState` 반환 | |
+| 4 | HID 컨트롤러 | `embodiment/hid_controller.py` | PyAutoGUI 마우스/키보드 제어 + 한글 클립보드 입력 | |
+| 5 | Blackboard (단기 메모리) | `state/blackboard.py` | thread-safe 상태 보관 + ScreenState 갱신 | |
+| 6 | Memory DB (장기 기억) | `state/memory_db.py` | SQLite 테이블 생성 + 태스크 로그 저장/조회 | |
+| 7 | Brain ↔ Sensor 연결 | `brain/nodes/reasoning_node.py` 수정 | Blackboard에서 screen_state 주입 | |
+| 8 | **하드코딩 E2E** | `tests/test_integration.py` | "메모장 열기 → 텍스트 입력" 시나리오 (LLM 없이) | |
+
+#### 2주차 검증 방법
+
+```bash
+# 센서 검증 (스크린샷 + OCR)
+python -c "
+from sensor.screen_grabber import ScreenGrabber
+from sensor.ocr_engine import OCREngine
+sg = ScreenGrabber(); img = sg.capture()
+ocr = OCREngine(); result = ocr.recognize(img)
+print(f'블록 수: {result.block_count}, 전문: {result.full_text[:100]}')
+"
+
+# HID 검증 (메모장 열기 + 입력)
+python tests/test_integration.py --scenario notepad_typing
+```
+
+---
+
+### 3주차 — OS 툴킷 + Excel 자동화 + MCP 도구 확장 (추천)
+
+> **목표**: OS 제어, Excel COM 자동화, MCP 도구 확장, Scope 제한
+
+| # | 작업 | 구현 파일 | 산출물 / 완료 기준 | 상태 |
+|---|------|----------|-------------------|------|
+| 1 | OS 툴킷 | `embodiment/os_toolkit.py` | 앱 실행, 창 전환, 클립보드, 파일 I/O | |
+| 2 | Excel 자동화 (COM) | `embodiment/office_toolkit.py` 확장 | Excel.Application COM 제어 + openpyxl 폴백 | |
+| 3 | OS 도구 연결 | `strategy/local_tools.py` 추가 | open_app, switch_window, list_directory 등 | |
+| 4 | Excel 도구 연결 | `strategy/local_tools.py` 추가 | create_excel, read_excel, edit_excel_cell | |
+| 5 | MCP 레지스트리 통합 | `strategy/tool_registry.py` 수정 | MCP 도구를 통합 레지스트리에 동적 등록 | |
+| 6 | Scope 제한 구현 | `embodiment/os_toolkit.py` | 허용 폴더/앱 화이트리스트 적용 | |
+| 7 | Soft Pause 구현 | `embodiment/kill_switch.py` 확장 | pause_event + 재개 로직 | |
+| 8 | **Office E2E** | — | "실적 데이터를 엑셀로 정리해줘" → Excel 파일 생성 | |
+| 9 | **통합 E2E** | — | "카카오톡에서 OO에게 메시지 보내줘" → 전체 파이프라인 | |
+
+---
+
+### 4주차 — 안정화 + 문서화 + 성능 최적화 (추천)
 
 > **목표**: 에러 핸들링 강화, 테스트 완비, Phase 1 최종 릴리스
 
-| # | 작업 | 산출물 / 완료 기준 |
-|---|------|-------------------|
-| 1 | 에러 핸들링 강화 | 모든 모듈에 try-except + ErrorCode 기반 구조화된 에러 |
-| 2 | 단위 테스트 작성 | `test_sensor.py`, `test_brain.py`, `test_embodiment.py` |
-| 3 | 통합 테스트 보강 | `test_integration.py`: 5개 이상의 시나리오 커버 |
-| 4 | 로깅 정비 | 모든 주요 동작에 적절한 로그 레벨/메시지 |
-| 5 | LLM 프롬프트 튜닝 | 실패 케이스 분석 → 프롬프트 개선 |
-| 6 | 성능 최적화 | OCR 캐싱, 스크린샷 리사이징, LLM 응답 시간 모니터링 |
-| 7 | `README.md` 작성 | 설치법, 실행법, 사용 예시, 안전 주의사항 |
-| 8 | `environment.yml` 확정 | 실제 사용된 라이브러리 + 정확한 버전 핀 |
-| 9 | `.env.example` 작성 | 모든 환경변수 키 + 설명 주석 |
+| # | 작업 | 산출물 / 완료 기준 | 상태 |
+|---|------|-------------------|------|
+| 1 | 에러 핸들링 강화 | 모든 모듈에 try-except + ErrorCode 기반 구조화된 에러 | |
+| 2 | 단위 테스트 작성 | `test_sensor.py`, `test_brain.py`, `test_embodiment.py` | |
+| 3 | 통합 테스트 보강 | `test_integration.py`: 5개 이상의 시나리오 커버 | |
+| 4 | 로깅 정비 | 모든 주요 동작에 적절한 로그 레벨/메시지 | |
+| 5 | LLM 프롬프트 튜닝 | 실패 케이스 분석 → 프롬프트 개선 | |
+| 6 | 성능 최적화 | OCR 캐싱, 스크린샷 리사이징, LLM 응답 시간 모니터링 | |
+| 7 | `README.md` 작성 | 설치법, 실행법, 사용 예시, 안전 주의사항 | |
+| 8 | `environment.yml` 확정 | 실제 사용된 라이브러리 + 정확한 버전 핀 | |
+| 9 | `.env.example` 작성 | 모든 환경변수 키 + 설명 주석 | |
 
 ---
 
@@ -220,24 +194,24 @@ python main.py --command "새 엑셀 파일을 만들고 1월~3월 매출 데이
 
 ```mermaid
 graph TB
-    S1["Sprint 1<br/>기반 구축"]
-    S2["Sprint 2<br/>Brain + LangGraph"]
-    S3["Sprint 3<br/>OS/Office + MCP"]
-    S4["Sprint 4<br/>안정화"]
+    W1["1주차<br/>에이전트 코어 + Word + Kill Switch"]
+    W2["2주차<br/>센서 + HID + 상태관리"]
+    W3["3주차<br/>OS/Excel + MCP 확장"]
+    W4["4주차<br/>안정화 + 문서화"]
     S5["Sprint 5<br/>PySide6 UI"]
     S6["Sprint 6<br/>STT/TTS + 외부"]
 
-    S1 --> S2
-    S2 --> S3
-    S3 --> S4
-    S4 --> S5
+    W1 --> W2
+    W2 --> W3
+    W3 --> W4
+    W4 --> S5
     S5 --> S6
 
-    subgraph Phase1["Phase 1: Core Agent"]
-        S1
-        S2
-        S3
-        S4
+    subgraph Phase1["Phase 1: Core Agent (주별 추천 수행단계)"]
+        W1
+        W2
+        W3
+        W4
     end
 
     subgraph Phase2["Phase 2: UI & Extensions"]
@@ -289,19 +263,18 @@ graph LR
 git clone <repository-url>
 cd Desktop_Pet
 
-# 2. Conda 환경 생성
-conda env create -f environment.yml
-conda activate desktop-pet
+# 2. Conda 환경 활성화
+conda activate desktoppet
 
 # 3. 환경변수 설정
 cp .env.example .env
 # .env 파일에서 DPET_VLM_ENDPOINT 등 설정
 
 # 4. 데이터 디렉토리 생성
-mkdir -p data/screenshots data/logs data/models
+mkdir -p data/screenshots data/logs data/models data/results
 
-# 5. Ollama 서버 연결 확인
-curl http://your-ollama-host:11434/api/tags
+# 5. Ollama 서버 연결 확인 (로컬)
+curl http://localhost:11434/api/tags
 
 # 6. 프로젝트 실행 (Phase 1 완료 후)
 python main.py --command "테스트 명령"
@@ -333,8 +306,8 @@ python main.py --command "테스트 명령"
 # ══════════════════════════════════════
 
 # ── LLM 설정 ──
-DPET_VLM_ENDPOINT=http://your-ollama-host:11434
-DPET_VLM_MODEL=gemma3:27b
+DPET_VLM_ENDPOINT=http://localhost:11434
+DPET_VLM_MODEL=qwen3-vl:8b
 DPET_LLM_TEMPERATURE=0.1
 DPET_LLM_MAX_TOKENS=2048
 
@@ -349,8 +322,9 @@ DPET_OCR_LANGUAGES=["ko","en"]
 DPET_OCR_CONFIDENCE_THRESHOLD=0.3
 
 # ── 안전 설정 ──
-DPET_KILL_SWITCH_CLICK_COUNT=6
-DPET_KILL_SWITCH_TIME_WINDOW=1.0
+DPET_KILL_SWITCH_CLICK_COUNT=10
+DPET_KILL_SWITCH_TIME_WINDOW=1.5
+DPET_KILL_SWITCH_BUTTON=right
 DPET_ALLOWED_APPS=[]
 DPET_ALLOWED_DIRECTORIES=[]
 DPET_DANGEROUS_TOOLS_ENABLED=false
@@ -360,6 +334,7 @@ DPET_DATA_DIR=data
 DPET_SCREENSHOTS_DIR=data/screenshots
 DPET_LOGS_DIR=data/logs
 DPET_DB_PATH=data/desktop_pet.db
+DPET_RESULTS_DIR=data/results
 ```
 
 ---
@@ -367,7 +342,7 @@ DPET_DB_PATH=data/desktop_pet.db
 ## 9. Conda 환경 정의 (environment.yml)
 
 ```yaml
-name: desktop-pet
+name: desktoppet
 channels:
   - conda-forge
   - pytorch
@@ -409,3 +384,4 @@ dependencies:
     # - openai-whisper>=20231117
     # - TTS>=0.22
 ```
+
